@@ -734,7 +734,7 @@ if st.session_state.get("show_dependency_form", False):
 # ===================== 简历自动读取（替换手动上传） =====================
 if not st.session_state.resumes_uploaded:
     st.markdown('<div class="sub-header">📁 简历自动加载</div>', unsafe_allow_html=True)
-    st.info("系统将自动从“候选者简历”文件夹中读取简历文件，并匹配“photo”文件夹中的照片。")
+    st.info("系统将自动从“resume”文件夹中读取简历文件，并匹配“photo”文件夹中的照片。")
 
     with st.spinner("正在自动加载简历..."):
         candidates, errors = auto_load_candidates(RESUME_FOLDER, PHOTO_FOLDER)
@@ -742,7 +742,7 @@ if not st.session_state.resumes_uploaded:
             for err in errors:
                 st.warning(err)
         if not candidates:
-            st.error("未能加载任何候选人，请检查“候选者简历”文件夹中的文件。")
+            st.error("未能加载任何候选人，请检查“resume”文件夹中的文件。")
             st.stop()
         else:
             st.session_state.candidates = candidates

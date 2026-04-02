@@ -265,7 +265,7 @@ def auto_load_candidates(resume_folder=RESUME_FOLDER, photo_folder=PHOTO_FOLDER)
             continue
 
     if not candidates:
-        errors.append("未找到任何有效简历文件。请确保“候选者简历”文件夹中包含 .xlsx/.xls 或 .docx 文件。")
+        errors.append("未找到任何有效简历文件。请确保“resume”文件夹中包含 .xlsx/.xls 或 .docx 文件。")
 
     return candidates, errors
 

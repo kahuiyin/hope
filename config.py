@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FIXED_PRESSURE_CONDITION = "低压力"
 
 # 简历和照片文件夹路径（相对于项目根目录）
-RESUME_FOLDER = os.path.join(BASE_DIR, "候选者简历")
+RESUME_FOLDER = os.path.join(BASE_DIR, "resume")
 PHOTO_FOLDER = os.path.join(BASE_DIR, "photo")
 
 BIAS_CONFIG = {

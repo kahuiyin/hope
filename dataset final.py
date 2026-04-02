@@ -23,7 +23,7 @@ from core_rating import (
 
 # ===================== 配置参数 =====================
 PHOTO_FOLDER = "photos"                # 最终生成的照片存放目录
-EXCEL_FILE = "候选者简历.xlsx"
+EXCEL_FILE = "resume.xlsx"
 CANDIDATE_COUNT = 60                   # 候选简历总数（男女各半）
 MATCH_SCORE_DIFF = 1                   # 评分相差1分内可匹配
 MATCH_AGE_DIFF = 3                     # 年龄相差3岁内可匹配
