@@ -14,7 +14,8 @@ from config import (
     EXPERIMENT_STAGES, STAY_TIME_CONFIG, SORT_OPTIONS,
     RATING_WEIGHTS, BIAS_CONFIG, JOB_DESCRIPTION,
     ALGORITHM_LITERACY_ITEMS, ALGORITHM_DEPENDENCY_ITEMS,
-    FIXED_PRESSURE_CONDITION
+    FIXED_PRESSURE_CONDITION,
+    RESUME_FOLDER, PHOTO_FOLDER          # 新增导入
 )
 from core_rating import (
     read_excel_resume, batch_read_word_resumes, batch_rating,
@@ -22,7 +23,8 @@ from core_rating import (
     sort_candidates_df,
     init_candidate_stay_time, update_candidate_stay_time,
     save_candidate_stay_time_data,
-    get_stage_experiment_config
+    get_stage_experiment_config,
+    auto_load_candidates                  # 新增导入
 )
 
 # ===================== 全局初始化 =====================
@@ -729,77 +731,37 @@ if st.session_state.get("show_dependency_form", False):
             save_dependency_data(scores)
     st.stop()
 
-# ===================== 简历上传（仅首次） =====================
+# ===================== 简历自动读取（替换手动上传） =====================
 if not st.session_state.resumes_uploaded:
-    st.markdown('<div class="sub-header">📁 简历导入</div>', unsafe_allow_html=True)
-    st.info(f"⚠️ {current_stage_config['name']}：{'请勿参考AI评分，独立完成决策' if not current_stage_config['ai_assist'] else '请参考AI评分完成决策'}")
+    st.markdown('<div class="sub-header">📁 简历自动加载</div>', unsafe_allow_html=True)
+    st.info("系统将自动从“候选者简历”文件夹中读取简历文件，并匹配“photo”文件夹中的照片。")
 
-    tab1, tab2 = st.tabs(["Excel批量导入（推荐）", "Word简历导入"])
-
-    with tab1:
-        excel_file = st.file_uploader("上传Excel简历表", type=["xlsx", "xls"], key="excel_uploader")
-        if excel_file:
-            with st.spinner("读取Excel简历数据..."):
-                candidates, error_msg = read_excel_resume(excel_file)
-                if error_msg:
-                    st.error(f"❌ {error_msg}")
-                else:
-                    st.session_state.candidates = candidates
-                    if current_stage_config["ai_assist"]:
-                        result_df = batch_rating(candidates, bias_mode=current_stage_config["bias_mode"])
-                        if result_df is None or result_df.empty:
-                            st.error("AI评分失败，请检查数据或联系管理员。")
-                            st.stop()
-                        st.session_state.result_df = result_df
-                        st.session_state.decisions = {row["候选人姓名"]: UI_CONFIG["decision_options"][1] for _, row in result_df.iterrows()}
-                    else:
-                        rows, decisions = generate_non_ai_stage_data(st.session_state.current_stage, candidates)
-                        st.session_state.result_df = pd.DataFrame(rows)
-                        st.session_state.decisions = decisions
-                    st.session_state.resumes_uploaded = True
-                    save_progress()
-                    st.success(f"✅ 成功读取{len(candidates)}位候选人数据！")
-                    st.rerun()
-
-    with tab2:
-        temp_folder = UI_CONFIG["temp_folder"]
-        if not os.path.exists(temp_folder):
-            os.makedirs(temp_folder)
-
-        word_files = st.file_uploader(
-            "上传Word简历文件",
-            type=["docx"],
-            accept_multiple_files=True,
-            key="word_uploader"
-        )
-
-        if word_files:
-            for file in word_files:
-                file_path = os.path.join(temp_folder, file.name)
-                with open(file_path, "wb") as f:
-                    f.write(file.getbuffer())
-            with st.spinner("批量读取Word简历..."):
-                candidates, errors = batch_read_word_resumes(temp_folder)
-                if errors:
-                    st.warning(f"⚠️ 部分文件读取失败：{'; '.join(errors)}")
-                if candidates:
-                    st.session_state.candidates = candidates
-                    if current_stage_config["ai_assist"]:
-                        result_df = batch_rating(candidates, bias_mode=current_stage_config["bias_mode"])
-                        if result_df is None or result_df.empty:
-                            st.error("AI评分失败，请检查数据或联系管理员。")
-                            st.stop()
-                        st.session_state.result_df = result_df
-                        st.session_state.decisions = {row["候选人姓名"]: UI_CONFIG["decision_options"][1] for _, row in result_df.iterrows()}
-                    else:
-                        rows, decisions = generate_non_ai_stage_data(st.session_state.current_stage, candidates)
-                        st.session_state.result_df = pd.DataFrame(rows)
-                        st.session_state.decisions = decisions
-                    st.session_state.resumes_uploaded = True
-                    save_progress()
-                    st.success(f"✅ 成功读取{len(candidates)}位候选人数据！")
-                    clean_temp_files(temp_folder)
-                    st.rerun()
+    with st.spinner("正在自动加载简历..."):
+        candidates, errors = auto_load_candidates(RESUME_FOLDER, PHOTO_FOLDER)
+        if errors:
+            for err in errors:
+                st.warning(err)
+        if not candidates:
+            st.error("未能加载任何候选人，请检查“候选者简历”文件夹中的文件。")
+            st.stop()
+        else:
+            st.session_state.candidates = candidates
+            # 初始化当前阶段的数据（默认是 pre 阶段）
+            if current_stage_config["ai_assist"]:
+                result_df = batch_rating(candidates, bias_mode=current_stage_config["bias_mode"])
+                if result_df is None or result_df.empty:
+                    st.error("AI评分失败，请检查数据或联系管理员。")
+                    st.stop()
+                st.session_state.result_df = result_df
+                st.session_state.decisions = {row["候选人姓名"]: UI_CONFIG["decision_options"][1] for _, row in result_df.iterrows()}
+            else:
+                rows, decisions = generate_non_ai_stage_data(st.session_state.current_stage, candidates)
+                st.session_state.result_df = pd.DataFrame(rows)
+                st.session_state.decisions = decisions
+            st.session_state.resumes_uploaded = True
+            save_progress()
+            st.success(f"✅ 成功加载 {len(candidates)} 位候选人！")
+            st.rerun()
     st.stop()
 
 # ===================== 招聘决策标注 =====================

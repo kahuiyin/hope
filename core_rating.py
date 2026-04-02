@@ -93,7 +93,7 @@ def read_excel_resume(file_obj):
                 "self_evaluation": str(row["自我评价"]).strip(),
                 "internship": str(row["实习经历"]).strip(),
                 "awards": str(row["获奖情况"]).strip(),
-                "photo": normalize_path(str(row["照片"]).strip()),
+                "photo": str(row["照片"]).strip() if "照片" in df.columns else "",  # 【修改】直接保留文件名
                 "phone": str(row["联系电话"]).strip(),
                 "email": str(row["邮箱"]).strip(),
                 "birthday": str(row["出生日期"]).strip(),
@@ -157,7 +157,7 @@ def read_word_resume(file_path):
             "self_evaluation": "",
             "internship": "",
             "awards": "",
-            "photo": "",
+            "photo": "",  # Word文件无照片列
             "phone": "",
             "email": "",
             "birthday": "",
@@ -181,6 +181,92 @@ def batch_read_word_resumes(folder_path):
                 errors.append(f"{file_name}：{err}")
             elif candidate and candidate["name"]:
                 candidates.append(candidate)
+    return candidates, errors
+
+
+# ===================== 新增自动匹配照片和自动加载简历 =====================
+def auto_match_photo(candidate_name, photo_folder=PHOTO_FOLDER, default_photo=UI_CONFIG["default_photo"],
+                     photo_filename=None):
+    """
+    根据候选人姓名或提供的照片文件名在 photo_folder 中查找匹配的照片文件。
+    如果提供了 photo_filename，则优先使用该文件名查找。
+    否则，根据 candidate_name 尝试常见扩展名。
+    如果找到则返回完整路径，否则返回空字符串。
+    """
+    # 1. 如果传入了照片文件名，优先使用
+    if photo_filename:
+        candidate_path = os.path.join(photo_folder, photo_filename)
+        if os.path.exists(candidate_path):
+            return candidate_path
+        # 如果提供的文件名不存在，可以选择回退到姓名匹配，这里选择不回退（避免误匹配）
+
+    # 2. 使用姓名匹配
+    extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+    for ext in extensions:
+        candidate_path = os.path.join(photo_folder, candidate_name + ext)
+        if os.path.exists(candidate_path):
+            return candidate_path
+
+    # 3. 尝试默认照片
+    default_path = os.path.join(photo_folder, default_photo)
+    if os.path.exists(default_path):
+        return default_path
+
+    return ""  # 无照片
+
+
+def auto_load_candidates(resume_folder=RESUME_FOLDER, photo_folder=PHOTO_FOLDER):
+    """
+    自动读取 resume_folder 中的简历文件（.xlsx/.xls 和 .docx），
+    并自动匹配 photo_folder 中的照片，返回 (candidates, errors)。
+    """
+    candidates = []
+    errors = []
+    if not os.path.exists(resume_folder):
+        errors.append(f"简历文件夹不存在：{resume_folder}")
+        return candidates, errors
+
+    # 遍历文件夹中的所有文件
+    for filename in os.listdir(resume_folder):
+        filepath = os.path.join(resume_folder, filename)
+        if not os.path.isfile(filepath):
+            continue
+
+        # 处理 Excel 文件（可包含多个候选人）
+        if filename.lower().endswith(('.xlsx', '.xls')):
+            file_obj = open(filepath, 'rb')
+            try:
+                cand_list, err = read_excel_resume(file_obj)
+                if err:
+                    errors.append(f"{filename}: {err}")
+                else:
+                    # 为每个候选人匹配照片
+                    for cand in cand_list:
+                        photo_filename = cand.get("photo", "")
+                        photo_path = auto_match_photo(cand["name"], photo_folder, photo_filename=photo_filename)
+                        cand["photo"] = photo_path
+                        candidates.append(cand)
+            finally:
+                file_obj.close()
+        # 处理 Word 文件（每个文件一个候选人）
+        elif filename.lower().endswith('.docx'):
+            cand, err = read_word_resume(filepath)
+            if err:
+                errors.append(f"{filename}: {err}")
+            elif cand and cand["name"]:
+                # Word简历没有照片列，用姓名匹配
+                photo_path = auto_match_photo(cand["name"], photo_folder, photo_filename=None)
+                cand["photo"] = photo_path
+                candidates.append(cand)
+            else:
+                errors.append(f"{filename}: 未读取到有效候选人信息")
+        # 其他文件忽略
+        else:
+            continue
+
+    if not candidates:
+        errors.append("未找到任何有效简历文件。请确保“候选者简历”文件夹中包含 .xlsx/.xls 或 .docx 文件。")
+
     return candidates, errors
 
 
@@ -468,7 +554,7 @@ def get_candidate_rating(candidate, bias_mode=False):
                 coeff = BIAS_CONFIG["gender"]["male_coeff"]
                 final_score = basic_score * coeff
 
-        final_score = round(final_score, 2)          # 【修改】去掉 +20
+        final_score = round(final_score, 2)  # 【修改】去掉 +20
         ai_analysis = generate_ai_analysis(candidate, scores, total_score=final_score)
 
         score_detail = f"【AI分析详情】\n{ai_analysis}"

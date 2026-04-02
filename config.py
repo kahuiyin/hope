@@ -1,7 +1,15 @@
 # ===================== 实验者配置文件 =====================
+import os
+
+# 获取当前文件所在目录的绝对路径
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 固定压力条件（可修改）
 FIXED_PRESSURE_CONDITION = "低压力"
+
+# 简历和照片文件夹路径（相对于项目根目录）
+RESUME_FOLDER = os.path.join(BASE_DIR, "候选者简历")
+PHOTO_FOLDER = os.path.join(BASE_DIR, "photo")
 
 BIAS_CONFIG = {
     "gender": {
@@ -119,7 +127,7 @@ UI_CONFIG = {
     "decision_options": ["进入面试", "待定", "拒绝"],
     "max_candidates_per_page": 5,                     # 每页5人
     "temp_folder": "temp_resumes",
-    "photo_folder": "E:\办公\毕业设计\线上网页代码\photos",   # 请根据实际修改
+    "photo_folder": PHOTO_FOLDER,                     # 自动使用 photo 文件夹
     "default_photo": "default.jpg"
 }
 
