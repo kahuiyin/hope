@@ -531,18 +531,10 @@ with st.sidebar:
 
         st.markdown("---")
         st.markdown("### 📊 招聘进度")
-        target_hires = st.number_input(
-            "计划招聘人数",
-            min_value=1,
-            max_value=50,
-            value=st.session_state.target_hires,
-            step=1,
-            key="target_hires_input",
-            help="仅供参考，不限制实际选择"
-        )
-        if target_hires != st.session_state.target_hires:
-            st.session_state.target_hires = target_hires
-            save_progress()
+
+        # 计划招聘人数固定为10（可根据需要修改初始值）
+        target_hires = st.session_state.target_hires  # 使用 session_state 中已有的值，不再显示输入框
+
 
         def get_current_stats():
             if not st.session_state.decisions:
@@ -551,6 +543,7 @@ with st.sidebar:
             pending = sum(1 for d in st.session_state.decisions.values() if d == "待定")
             rejected = sum(1 for d in st.session_state.decisions.values() if d == "拒绝")
             return hired, pending, rejected
+
 
         hired, pending, rejected = get_current_stats()
         col1, col2, col3 = st.columns(3)
