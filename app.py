@@ -717,7 +717,11 @@ if st.session_state.get("show_dependency_form", False):
     with st.form("dependency_form"):
         scores = []
         for i, item in enumerate(ALGORITHM_DEPENDENCY_ITEMS):
-            score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
+            # 压力题使用 1-7 分制，默认值为 4；其他题目使用 1-5 分制，默认值为 3
+            if "压力" in item:  # 通过关键词识别压力题
+                score = st.slider(item, 1, 7, 4, key=f"dep_{i}")
+            else:
+                score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
             scores.append(score)
         submitted_dep = st.form_submit_button("提交量表")
         if submitted_dep:
