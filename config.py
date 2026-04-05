@@ -5,7 +5,7 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 固定压力条件（可修改）
-FIXED_PRESSURE_CONDITION = "低压力"
+FIXED_PRESSURE_CONDITION = "高压力"
 
 # 简历和照片文件夹路径（相对于项目根目录）
 RESUME_FOLDER = os.path.join(BASE_DIR, "resume")
