@@ -656,7 +656,7 @@ if st.session_state.get("scroll_to_top", False):
     st.session_state.scroll_to_top = False
 
 if st.session_state.pressure_condition == "高压力":
-    st.warning("⚠️ 请在每个阶段5分钟内完成所有决策。")
+    st.warning("⚠️ 每个阶段决策必须在5分钟内完成")
     if st.session_state.current_stage not in st.session_state.stage_start_time:
         st.session_state.stage_start_time[st.session_state.current_stage] = time.time()
     elapsed = time.time() - st.session_state.stage_start_time[st.session_state.current_stage]
