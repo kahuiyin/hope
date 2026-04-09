@@ -51,14 +51,11 @@ def init_session_state():
         "stage_total_time": {},
         "pre_order": None,
         "scroll_to_top": False,
-        "dependency_completed": False,
-        "show_dependency_form": False,
-        "show_thanks": False,
         "manipulation_check_done": False,
         "post_confidence": {},
-        "debriefing_completed": False,
-        "show_debriefing": False,
         "show_manipulation_check": False,
+        "show_final_questionnaire": False,   # 统一问卷标志
+        "show_thanks": False,
     }
     for key, value in default_states.items():
         if key not in st.session_state:
@@ -84,9 +81,7 @@ def save_progress():
         "target_hires": st.session_state.target_hires,
         "algorithm_literacy": st.session_state.algorithm_literacy,
         "pressure_condition": st.session_state.pressure_condition,
-        "dependency_completed": st.session_state.dependency_completed,
         "manipulation_check_done": st.session_state.manipulation_check_done,
-        "debriefing_completed": st.session_state.debriefing_completed,
     }
     progress_path = os.path.join(st.session_state.experiment_dir, "progress.json")
     with open(progress_path, "w", encoding="utf-8") as f:
@@ -106,9 +101,7 @@ def load_progress():
             st.session_state.target_hires = progress.get("target_hires", 5)
             st.session_state.algorithm_literacy = progress.get("algorithm_literacy", [4] * len(ALGORITHM_LITERACY_ITEMS))
             st.session_state.pressure_condition = progress.get("pressure_condition", FIXED_PRESSURE_CONDITION)
-            st.session_state.dependency_completed = progress.get("dependency_completed", False)
             st.session_state.manipulation_check_done = progress.get("manipulation_check_done", False)
-            st.session_state.debriefing_completed = progress.get("debriefing_completed", False)
 
             if st.session_state.stage_completed.get(st.session_state.current_stage, False):
                 csv_path = os.path.join(st.session_state.experiment_dir, f"stage_{st.session_state.current_stage}.csv")
@@ -383,8 +376,8 @@ def switch_to_next_stage():
             return False
     next_stage = get_next_stage(current)
     if next_stage is None:
-        # 所有阶段完成，开始问卷流程：先依赖量表，然后事后回顾
-        st.session_state.show_dependency_form = True
+        # 所有阶段完成，显示统一问卷
+        st.session_state.show_final_questionnaire = True
         st.rerun()
         return True
 
@@ -434,9 +427,9 @@ def package_experiment_data():
     zip_buffer.seek(0)
     return zip_buffer
 
-# ===================== 生成汇总表（核心新增） =====================
+# ===================== 生成汇总表（中文列名） =====================
 def generate_master_table():
-    """生成一个包含所有数据的扁平化表格（每个被试一行）"""
+    """生成一个包含所有数据的扁平化表格（每个被试一行），列名为中文"""
     exp_dir = st.session_state.experiment_dir
     if not exp_dir:
         return
@@ -444,71 +437,70 @@ def generate_master_table():
     record = {}
 
     # 1. 基本信息
-    record["subject_id"] = st.session_state.experimenter_id
+    record["被试编号"] = st.session_state.experimenter_id
     info = st.session_state.experimenter_info
-    record["name"] = info.get("姓名", "")
-    record["student_id"] = info.get("学号", "")
-    record["gender"] = info.get("性别", "")
-    record["age"] = info.get("年龄", "")
-    record["major"] = info.get("专业", "")
-    record["education"] = info.get("学历", "")
-    record["ai_familiarity"] = info.get("AI熟悉程度", "")
-    record["recruitment_exp"] = info.get("招聘经验", "")
-    record["similar_exp"] = info.get("类似实验经验", "")
-    record["pressure_condition"] = st.session_state.pressure_condition
+    record["姓名"] = info.get("姓名", "")
+    record["学号/学校"] = info.get("学号", "")
+    record["性别"] = info.get("性别", "")
+    record["年龄"] = info.get("年龄", "")
+    record["专业"] = info.get("专业", "")
+    record["最高学历"] = info.get("学历", "")
+    record["对AI熟悉程度(1-7)"] = info.get("AI熟悉程度", "")
+    record["招聘经验(有/无)"] = info.get("招聘经验", "")
+    record["类似实验经验(是/否)"] = info.get("类似实验经验", "")
+    record["压力条件"] = st.session_state.pressure_condition
 
-    # 2. 算法素养
+    # 2. 算法素养（10题）
     for i, score in enumerate(st.session_state.algorithm_literacy, 1):
-        record[f"alg_lit_{i}"] = score
-    record["alg_lit_total"] = sum(st.session_state.algorithm_literacy)
+        record[f"算法素养_题{i}"] = score
+    record["算法素养_总分"] = sum(st.session_state.algorithm_literacy)
 
     # 3. 操纵检查
     manip_path = os.path.join(exp_dir, "manipulation_check.json")
     if os.path.exists(manip_path):
         with open(manip_path, "r", encoding="utf-8") as f:
             m = json.load(f)
-        record["bias_awareness"] = m.get("bias_awareness", "")
-        record["bias_detail"] = m.get("bias_detail", "")
+        record["是否注意到AI偏差"] = m.get("bias_awareness", "")
+        record["偏差详情"] = m.get("bias_detail", "")
 
-    # 4. 事后回顾
-    debrief_path = os.path.join(exp_dir, "debriefing.json")
-    if os.path.exists(debrief_path):
-        with open(debrief_path, "r", encoding="utf-8") as f:
-            d = json.load(f)
-        record["ai_fairness"] = d.get("fairness", "")
-        record["recall_ai_score"] = d.get("recall_ai_score", "")
-        record["ai_influence"] = d.get("influence", "")
-        record["correction_behavior"] = d.get("correction_behavior", "")
-        record["comments"] = d.get("comments", "")
+    # 4. 事后回顾（从最终问卷中保存的数据）
+    final_path = os.path.join(exp_dir, "final_questionnaire.json")
+    if os.path.exists(final_path):
+        with open(final_path, "r", encoding="utf-8") as f:
+            fq = json.load(f)
+        record["AI公平性评分(1-7)"] = fq.get("fairness", "")
+        record["不自觉回忆AI分数(1-7)"] = fq.get("recall_ai_score", "")
+        record["AI影响程度(1-7)"] = fq.get("influence", "")
+        record["纠正行为"] = fq.get("correction_behavior", "")
+        record["反馈评论"] = fq.get("comments", "")
 
-    # 5. 算法依赖量表
+    # 5. 算法依赖量表（6题）
     dep_path = os.path.join(exp_dir, "algorithm_dependency.json")
     if os.path.exists(dep_path):
         with open(dep_path, "r", encoding="utf-8") as f:
             dep = json.load(f)
         scores = dep.get("scores", [])
         for i, s in enumerate(scores, 1):
-            record[f"dep_{i}"] = s
-        record["dep_total"] = dep.get("total_score", 0)
+            record[f"算法依赖_题{i}"] = s
+        record["算法依赖_总分"] = dep.get("total_score", 0)
 
-    # 6. 各阶段统计
+    # 6. 各阶段决策统计
     for stage in ["pre", "mid", "post"]:
         csv_path = os.path.join(exp_dir, f"stage_{stage}.csv")
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path, encoding="utf-8-sig")
             if "招聘决策" in df.columns:
-                record[f"{stage}_hired"] = (df["招聘决策"] == "进入面试").sum()
-                record[f"{stage}_pending"] = (df["招聘决策"] == "待定").sum()
-                record[f"{stage}_rejected"] = (df["招聘决策"] == "拒绝").sum()
+                record[f"{stage}_录用人数"] = (df["招聘决策"] == "进入面试").sum()
+                record[f"{stage}_待定人数"] = (df["招聘决策"] == "待定").sum()
+                record[f"{stage}_拒绝人数"] = (df["招聘决策"] == "拒绝").sum()
             if "阶段总耗时（秒）" in df.columns:
-                record[f"{stage}_total_time"] = df["阶段总耗时（秒）"].iloc[0] if len(df) > 0 else 0
+                record[f"{stage}_总耗时(秒)"] = df["阶段总耗时（秒）"].iloc[0] if len(df) > 0 else 0
             if stage == "post" and "决策信心" in df.columns:
-                # 计算平均信心（跳过空值）
                 conf_vals = pd.to_numeric(df["决策信心"], errors="coerce").dropna()
-                record["post_confidence_avg"] = conf_vals.mean() if len(conf_vals) > 0 else 0
+                record["post阶段平均决策信心(1-7)"] = conf_vals.mean() if len(conf_vals) > 0 else 0
 
     # 7. 实验日期
-    record["experiment_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    record["实验完成时间"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # 保存为 CSV
     df_master = pd.DataFrame([record])
@@ -553,28 +545,20 @@ def save_manipulation_check_data(bias_awareness, bias_detail):
     save_progress()
     st.rerun()
 
-def save_dependency_data(scores):
-    """保存算法依赖量表，然后触发事后回顾"""
-    if st.session_state.current_stage in get_stage_key_list():
-        save_current_stage()
+def save_final_questionnaire(dep_scores, fairness, recall, influence, correction, comments):
+    """保存最终问卷数据（依赖量表+事后回顾）"""
+    # 保存依赖量表
     dep_data = {
         "items": ALGORITHM_DEPENDENCY_ITEMS,
-        "scores": scores,
-        "total_score": sum(scores),
+        "scores": dep_scores,
+        "total_score": sum(dep_scores),
         "timestamp": datetime.now().isoformat()
     }
-    save_path = os.path.join(st.session_state.experiment_dir, "algorithm_dependency.json")
-    with open(save_path, "w", encoding="utf-8") as f:
+    dep_path = os.path.join(st.session_state.experiment_dir, "algorithm_dependency.json")
+    with open(dep_path, "w", encoding="utf-8") as f:
         json.dump(dep_data, f, ensure_ascii=False, indent=2)
-    st.session_state.dependency_completed = True
-    st.session_state.show_dependency_form = False
-    # 依赖量表完成后，显示事后回顾
-    st.session_state.show_debriefing = True
-    save_progress()
-    st.rerun()
 
-def save_debriefing_data(fairness, recall, influence, correction, comments):
-    """保存事后回顾，然后生成汇总表并显示感谢界面"""
+    # 保存事后回顾
     debrief_data = {
         "fairness": fairness,
         "recall_ai_score": recall,
@@ -583,22 +567,16 @@ def save_debriefing_data(fairness, recall, influence, correction, comments):
         "comments": comments,
         "timestamp": datetime.now().isoformat()
     }
-    save_path = os.path.join(st.session_state.experiment_dir, "debriefing.json")
-    with open(save_path, "w", encoding="utf-8") as f:
+    debrief_path = os.path.join(st.session_state.experiment_dir, "final_questionnaire.json")
+    with open(debrief_path, "w", encoding="utf-8") as f:
         json.dump(debrief_data, f, ensure_ascii=False, indent=2)
-    st.session_state.debriefing_completed = True
-    st.session_state.show_debriefing = False
+
     # 生成汇总表
     generate_master_table()
     # 显示感谢界面
+    st.session_state.show_final_questionnaire = False
     st.session_state.show_thanks = True
     save_progress()
-    st.rerun()
-
-def finalize_experiment():
-    """提交实验数据（兼容旧逻辑，实际已由问卷流程替代）"""
-    # 此函数保留但不再使用主要逻辑，避免冲突
-    st.session_state.show_dependency_form = True
     st.rerun()
 
 # ===================== 自定义CSS =====================
@@ -751,6 +729,7 @@ st.markdown(JOB_DESCRIPTION)
 st.divider()
 
 # ===================== 问卷表单 =====================
+# 操纵检查表单
 if st.session_state.get("show_manipulation_check", False):
     st.markdown("### 请回答以下问题（必填）")
     st.markdown("在刚才的 **【实验2】AI辅助** 阶段，你观察到 AI 评分是否存在系统性偏差？")
@@ -766,25 +745,21 @@ if st.session_state.get("show_manipulation_check", False):
             save_manipulation_check_data(bias_awareness, bias_detail)
     st.stop()
 
-if st.session_state.get("show_dependency_form", False):
-    st.markdown("### 问卷一：算法依赖")
-    st.markdown("请根据您的真实感受评分（1=完全不同意，5=完全同意）")
-    with st.form("dependency_form"):
-        scores = []
+# 统一最终问卷（依赖量表+事后回顾）
+if st.session_state.get("show_final_questionnaire", False):
+    st.markdown("### 实验结束问卷")
+    st.markdown("请根据您的真实感受回答以下所有问题。")
+    with st.form("final_questionnaire_form"):
+        st.subheader("第一部分：算法依赖")
+        dep_scores = []
         for i, item in enumerate(ALGORITHM_DEPENDENCY_ITEMS):
             if "压力" in item:
                 score = st.slider(item, 1, 7, 4, key=f"dep_{i}")
             else:
                 score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
-            scores.append(score)
-        submitted = st.form_submit_button("提交")
-        if submitted:
-            save_dependency_data(scores)
-    st.stop()
-
-if st.session_state.get("show_debriefing", False):
-    st.markdown("### 问卷二：实验反馈")
-    with st.form("debriefing_form"):
+            dep_scores.append(score)
+        
+        st.subheader("第二部分：实验反馈")
         fairness = st.slider("我觉得 AI 评分的公平性如何？", 1, 7, 4, help="1=非常不公平，7=非常公平")
         recall = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4)
         influence = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4)
@@ -793,19 +768,21 @@ if st.session_state.get("show_debriefing", False):
             ["是，我尽量反着 AI 的建议来", "是，但我仍部分参考了 AI", "否，我认为 AI 的评分有道理", "我根本没注意到偏差"],
             index=3
         )
-        comments = st.text_area("其他反馈")
-        submitted = st.form_submit_button("提交")
+        comments = st.text_area("其他反馈或感想（可选）")
+        
+        submitted = st.form_submit_button("提交并完成实验")
         if submitted:
-            save_debriefing_data(fairness, recall, influence, correction, comments)
+            save_final_questionnaire(dep_scores, fairness, recall, influence, correction, comments)
     st.stop()
 
+# 感谢界面
 if st.session_state.get("show_thanks", False):
     st.markdown("### 🎉 实验完成")
-    st.success("感谢您的参与！")
+    st.success("感谢您的参与！您的数据已成功保存。")
     st.balloons()
     if st.session_state.current_stage in get_stage_key_list():
         save_current_stage()
-    st.markdown("请下载数据压缩包：")
+    st.markdown("请点击下方按钮下载实验数据压缩包：")
     zip_buffer = package_experiment_data()
     if zip_buffer:
         st.download_button(
@@ -842,7 +819,7 @@ if st.session_state.resumes_uploaded:
         next_key = get_next_stage(st.session_state.current_stage)
         if next_key is None:
             if st.button("📤 提交实验数据", type="primary", use_container_width=True):
-                st.session_state.show_dependency_form = True
+                st.session_state.show_final_questionnaire = True
                 st.rerun()
         else:
             next_name = EXPERIMENT_STAGES[next_key]["name"]
@@ -937,7 +914,7 @@ if st.session_state.resumes_uploaded:
             next_key = get_next_stage(st.session_state.current_stage)
             if next_key is None:
                 if st.button("📤 提交实验数据", type="primary"):
-                    st.session_state.show_dependency_form = True
+                    st.session_state.show_final_questionnaire = True
                     st.rerun()
             else:
                 if st.button(f"➡️ 进入{EXPERIMENT_STAGES[next_key]['name']}", type="primary"):
