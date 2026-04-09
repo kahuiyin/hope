@@ -54,7 +54,7 @@ def init_session_state():
         "manipulation_check_done": False,
         "post_confidence": {},
         "show_manipulation_check": False,
-        "show_final_questionnaire": False,   # 统一问卷标志
+        "show_final_questionnaire": False,
         "show_thanks": False,
     }
     for key, value in default_states.items():
@@ -427,9 +427,9 @@ def package_experiment_data():
     zip_buffer.seek(0)
     return zip_buffer
 
-# ===================== 生成汇总表（中文列名） =====================
+# ===================== 生成汇总表（中文列名，分性别比例） =====================
 def generate_master_table():
-    """生成一个包含所有数据的扁平化表格（每个被试一行），列名为中文"""
+    """生成一个包含所有数据的扁平化表格（每个被试一行），列名为中文，并增加分性别录用比例"""
     exp_dir = st.session_state.experiment_dir
     if not exp_dir:
         return
@@ -484,20 +484,45 @@ def generate_master_table():
             record[f"算法依赖_题{i}"] = s
         record["算法依赖_总分"] = dep.get("total_score", 0)
 
-    # 6. 各阶段决策统计
+    # 6. 各阶段决策统计（增加分性别录用比例）
     for stage in ["pre", "mid", "post"]:
         csv_path = os.path.join(exp_dir, f"stage_{stage}.csv")
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path, encoding="utf-8-sig")
+            # 总录用/待定/拒绝
             if "招聘决策" in df.columns:
                 record[f"{stage}_录用人数"] = (df["招聘决策"] == "进入面试").sum()
                 record[f"{stage}_待定人数"] = (df["招聘决策"] == "待定").sum()
                 record[f"{stage}_拒绝人数"] = (df["招聘决策"] == "拒绝").sum()
+
+                # 分性别录用比例
+                if "性别" in df.columns:
+                    # 男性
+                    male_df = df[df["性别"] == "男"]
+                    male_total = len(male_df)
+                    male_hired = (male_df["招聘决策"] == "进入面试").sum() if male_total > 0 else 0
+                    record[f"{stage}_男性录用比例(%)"] = round(male_hired / male_total * 100, 1) if male_total > 0 else 0
+                    # 女性
+                    female_df = df[df["性别"] == "女"]
+                    female_total = len(female_df)
+                    female_hired = (female_df["招聘决策"] == "进入面试").sum() if female_total > 0 else 0
+                    record[f"{stage}_女性录用比例(%)"] = round(female_hired / female_total * 100, 1) if female_total > 0 else 0
+
+            # 阶段总耗时
             if "阶段总耗时（秒）" in df.columns:
                 record[f"{stage}_总耗时(秒)"] = df["阶段总耗时（秒）"].iloc[0] if len(df) > 0 else 0
+
+            # post阶段额外：平均信心 + 分性别平均信心
             if stage == "post" and "决策信心" in df.columns:
+                # 整体平均信心
                 conf_vals = pd.to_numeric(df["决策信心"], errors="coerce").dropna()
                 record["post阶段平均决策信心(1-7)"] = conf_vals.mean() if len(conf_vals) > 0 else 0
+                # 分性别平均信心
+                if "性别" in df.columns:
+                    male_conf = pd.to_numeric(df[df["性别"] == "男"]["决策信心"], errors="coerce").dropna()
+                    female_conf = pd.to_numeric(df[df["性别"] == "女"]["决策信心"], errors="coerce").dropna()
+                    record["post阶段男性平均信心(1-7)"] = male_conf.mean() if len(male_conf) > 0 else 0
+                    record["post阶段女性平均信心(1-7)"] = female_conf.mean() if len(female_conf) > 0 else 0
 
     # 7. 实验日期
     record["实验完成时间"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
