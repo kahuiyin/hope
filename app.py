@@ -54,7 +54,6 @@ def init_session_state():
         "dependency_completed": False,
         "show_dependency_form": False,
         "show_thanks": False,
-        # 新增状态变量
         "show_manipulation_check": False,
         "manipulation_check_done": False,
         "manipulation_answer": None,
@@ -123,7 +122,6 @@ def load_progress():
                     st.session_state.result_df = df
                     if "招聘决策" in df.columns:
                         st.session_state.decisions = dict(zip(df["候选人姓名"], df["招聘决策"]))
-                    # 如果是post阶段，恢复信心值
                     if st.session_state.current_stage == "post" and "决策信心" in df.columns:
                         st.session_state.post_confidence = dict(zip(df["候选人姓名"], df["决策信心"]))
         except Exception as e:
@@ -216,7 +214,7 @@ def save_current_stage():
 
     stage_df["招聘决策"] = stage_df["候选人姓名"].map(st.session_state.decisions)
 
-    # 添加决策信心列（仅post阶段）
+    # 决策信心（仅 post 阶段）
     if current == "post":
         confidence_list = [st.session_state.post_confidence.get(name, 4) for name in stage_df["候选人姓名"]]
         stage_df["决策信心"] = confidence_list
@@ -273,7 +271,6 @@ def load_stage_data(stage_key):
         st.session_state.result_df = df
         if "招聘决策" in df.columns:
             st.session_state.decisions = dict(zip(df["候选人姓名"], df["招聘决策"]))
-        # 恢复post信心值
         if stage_key == "post" and "决策信心" in df.columns:
             st.session_state.post_confidence = dict(zip(df["候选人姓名"], df["决策信心"]))
         return True
@@ -392,11 +389,15 @@ def switch_to_next_stage():
         st.rerun()
         return True
     
-    # 如果即将进入post阶段且尚未完成操纵检查，则显示操纵检查表单
+    # 如果即将进入 post 阶段且尚未完成操纵检查，则显示操纵检查表单
     if next_stage == "post" and not st.session_state.manipulation_check_done:
         st.session_state.show_manipulation_check = True
         st.rerun()
         return False
+
+    # 清空 post 阶段的信心记录（新阶段）
+    if next_stage == "post":
+        st.session_state.post_confidence = {}
 
     st.session_state.current_stage = next_stage
     st.session_state.result_df = pd.DataFrame()
@@ -478,7 +479,6 @@ def finalize_experiment():
 
 def save_dependency_data(scores):
     """保存算法依赖量表数据，并显示感谢界面"""
-    # 先保存当前阶段数据，确保最后阶段数据已写入
     if st.session_state.current_stage in get_stage_key_list():
         save_current_stage()
     dep_data = {
@@ -540,7 +540,6 @@ st.markdown("""
         font-weight: 500;
         cursor: pointer;
     }
-    /* 缩小侧边栏指标数值的字体，避免两位数显示不全 */
     [data-testid="stSidebar"] [data-testid="stMetricValue"] {
         font-size: 1rem !important;
     }
@@ -746,24 +745,11 @@ if st.session_state.get("show_manipulation_check", False):
         )
         bias_detail = st.text_area("如果选择了“其他”，请具体描述：", placeholder="例如：AI 对某些学校背景的人打分偏低...")
         
-        correction_intent = st.radio(
-            "在后续独立决策时，你是否有意识地尝试纠正你察觉到的偏差？",
-            options=[
-                "是，我尽量反着 AI 的建议来",
-                "是，但我仍部分参考了 AI",
-                "否，我认为 AI 的评分有道理",
-                "我根本没注意到偏差"
-            ],
-            index=3
-        )
-        
         submitted = st.form_submit_button("提交并继续")
         if submitted:
-            # 保存操纵检查结果
             manipulation_data = {
                 "bias_awareness": bias_awareness,
                 "bias_detail": bias_detail,
-                "correction_intent": correction_intent,
                 "timestamp": datetime.now().isoformat()
             }
             save_path = os.path.join(st.session_state.experiment_dir, "manipulation_check.json")
@@ -774,8 +760,10 @@ if st.session_state.get("show_manipulation_check", False):
             st.session_state.show_manipulation_check = False
             st.session_state.manipulation_answer = manipulation_data
             
-            # 手动切换到 post 阶段（复用原有逻辑）
+            # 手动切换到 post 阶段
             next_stage = "post"
+            # 清空 post 信心记录
+            st.session_state.post_confidence = {}
             st.session_state.current_stage = next_stage
             st.session_state.result_df = pd.DataFrame()
             st.session_state.decisions = {}
@@ -804,18 +792,32 @@ if st.session_state.get("show_manipulation_check", False):
 # ===================== 事后回顾性评价表单 =====================
 if st.session_state.get("show_debriefing", False):
     st.markdown("### 实验结束后的简短问卷")
-    st.markdown("请根据您的真实感受回答以下问题（1=完全不同意，7=完全同意）")
+    st.markdown("请根据您的真实感受回答以下问题")
     with st.form("debriefing_form"):
         q1 = st.slider("我觉得 AI 评分的公平性如何？", 1, 7, 4, help="1=非常不公平，7=非常公平")
         q2 = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4)
         q3 = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4)
+        
+        correction_behavior = st.radio(
+            "在刚才的独立决策阶段（实验3），你是否有意识地尝试纠正你察觉到的偏差？",
+            options=[
+                "是，我尽量反着 AI 的建议来",
+                "是，但我仍部分参考了 AI",
+                "否，我认为 AI 的评分有道理",
+                "我根本没注意到偏差"
+            ],
+            index=3
+        )
+        
         q4 = st.text_area("您对本次实验的任何其他反馈或感想：", placeholder="可选")
+        
         submitted = st.form_submit_button("提交并继续")
         if submitted:
             debrief_data = {
                 "fairness": q1,
                 "recall_ai_score": q2,
                 "influence": q3,
+                "correction_behavior": correction_behavior,
                 "comments": q4,
                 "timestamp": datetime.now().isoformat()
             }
@@ -824,7 +826,6 @@ if st.session_state.get("show_debriefing", False):
                 json.dump(debrief_data, f, ensure_ascii=False, indent=2)
             st.session_state.debriefing_done = True
             st.session_state.show_debriefing = False
-            # 接着显示依赖量表
             st.session_state.show_dependency_form = True
             st.rerun()
     st.stop()
@@ -834,7 +835,6 @@ if st.session_state.get("show_thanks", False):
     st.markdown("### 🎉 实验完成")
     st.success("感谢您的决策与回答！您的数据已成功保存。")
     st.balloons()
-    # 再次保存当前阶段，确保最后阶段数据已写入
     if st.session_state.current_stage in get_stage_key_list():
         save_current_stage()
     st.markdown("请点击下方按钮下载实验数据压缩包：")
@@ -1037,7 +1037,7 @@ if st.session_state.resumes_uploaded:
                 confidence = st.slider(
                     f"你对此决策的信心 (1=非常没信心, 7=非常有信心)",
                     1, 7, current_confidence,
-                    key=f"confidence_{name}_post_{idx}"
+                    key=f"confidence_{name}_post"
                 )
                 st.session_state.post_confidence[name] = confidence
 
