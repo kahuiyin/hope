@@ -878,46 +878,101 @@ if st.session_state.resumes_uploaded:
             init_candidate_stay_time(st.session_state, name)
             update_candidate_stay_time(st.session_state, name)
 
-            col1, col2, col3 = st.columns([1,2,2])
+            col1, col2, col3 = st.columns([1, 2, 2])
+
             with col1:
-                photo = row.get("照片", "")
-                if photo and os.path.exists(photo):
-                    st.image(photo, width=150)
+                photo_file = row.get("照片", "")
+                if photo_file and photo_file.strip():
+                    photo_filename = os.path.basename(photo_file)
+                    photo_path = os.path.join(UI_CONFIG["photo_folder"], photo_filename)
+                    photo_path = normalize_path(photo_path)
+
+                    valid_photo_path = None
+                    if os.path.exists(photo_path):
+                        valid_photo_path = photo_path
+                    else:
+                        photo_path_no_ext = os.path.splitext(photo_path)[0]
+                        img_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+                        for ext in img_extensions:
+                            test_path = photo_path_no_ext + ext
+                            if os.path.exists(test_path):
+                                valid_photo_path = test_path
+                                break
+
+                    if valid_photo_path:
+                        st.image(valid_photo_path, width=150, caption="候选人照片")
+                    else:
+                        st.warning(f"照片文件未找到：{photo_path}")
                 else:
-                    st.write("📷 无照片")
+                    default_path = os.path.join(UI_CONFIG["photo_folder"], UI_CONFIG["default_photo"])
+                    default_path = normalize_path(default_path)
+                    if os.path.exists(default_path):
+                        st.image(default_path, width=150, caption="无照片")
+                    else:
+                        st.write("📷 无照片")
+
             with col2:
-                st.write(f"**姓名**：{name}")
-                st.write(f"**性别**：{row['性别']}")
-                st.write(f"**年龄**：{row.get('年龄','未知')}")
-                st.write(f"**学历**：{row['学历']}")
-                st.write(f"**工作年限**：{row['工作年限']}年")
-                st.write(f"**毕业院校**：{row.get('毕业院校','')} ({row.get('院校等级','')})")
+                st.markdown("**📋 基础信息**")
+                st.write(f"👤 姓名：{row['候选人姓名']}")
+                st.write(f"⚥ 性别：{row['性别']}")
+                st.write(f"🎂 年龄：{row.get('年龄', '未知')}岁")
+                st.write(f"📅 出生日期：{row.get('出生日期', '未知')}")
+                st.write(f"📞 电话：{row.get('联系电话', '无')}")
+                st.write(f"📧 邮箱：{row.get('邮箱', '无')}")
+                st.write(f"🏫 毕业院校：{row.get('毕业院校', '')} ({row.get('院校等级', '')})")
+                st.write(f"📚 专业：{row.get('专业', '')}")
+                st.write(f"🎓 学历：{row['学历']}")
+                st.write(f"💼 工作年限：{row['工作年限']}年")
+
             with col3:
-                st.write(f"**技能**：{safe_list_to_str(row['技能'])}")
-                st.write(f"**项目数**：{row['相关项目数']}")
-                st.write(f"**证书**：{safe_list_to_str(row['证书'])}")
-                st.write(f"**实习**：{row.get('实习经历','无')[:50]}...")
-                st.write(f"**获奖**：{row.get('获奖情况','无')[:50]}...")
+                st.markdown("**🔧 能力资质**")
+                st.write(f"🛠️ 掌握技能：{safe_list_to_str(row['技能'])}")
+                st.write(f"📁 相关项目数：{row['相关项目数']}个")
+                st.write(f"📜 持有证书：{safe_list_to_str(row['证书'])}")
+
+                st.markdown("**🏆 实习与获奖**")
+                internship = row.get('实习经历', '')
+                st.write(f"💼 实习经历：{internship if internship else '无'}")
+                awards = row.get('获奖情况', '')
+                st.write(f"🏅 获奖情况：{awards if awards else '无'}")
+
+                st.markdown("**📝 自我评价**")
+                self_eval = row.get('自我评价', '')
+                st.write(self_eval if self_eval else '无')
 
             if current_stage_config["show_score"]:
+                st.divider()
+                st.write("**📊 AI评分说明**")
                 st.info(row["评分说明"])
 
-            curr_dec = st.session_state.decisions.get(name, UI_CONFIG["decision_options"][1])
-            decision = st.radio(
-                f"决策",
-                UI_CONFIG["decision_options"],
-                index=UI_CONFIG["decision_options"].index(curr_dec),
-                key=f"dec_{st.session_state.current_stage}_{name}",
-                horizontal=True,
-                label_visibility="collapsed"
-            )
+            current_decision = st.session_state.decisions.get(name, UI_CONFIG["decision_options"][1])
+            with st.container():
+                st.markdown('<div class="custom-decision-radio">', unsafe_allow_html=True)
+                decision = st.radio(
+                    f"请选择{name}的招聘决策",
+                    UI_CONFIG["decision_options"],
+                    index=UI_CONFIG["decision_options"].index(current_decision),
+                    key=f"decision_{name}_{st.session_state.current_stage}_{idx}",
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # 如果是 post 阶段，显示决策信心滑块
             if st.session_state.current_stage == "post":
-                conf = st.slider(f"信心 (1-7)", 1, 7, st.session_state.post_confidence.get(name, 4), key=f"conf_{name}")
-                st.session_state.post_confidence[name] = conf
-            if decision != curr_dec:
-                record_decision_time(name, decision, curr_dec)
+                current_confidence = st.session_state.post_confidence.get(name, 4)
+                confidence = st.slider(
+                    f"你对此决策的信心 (1=非常没信心, 7=非常有信心)",
+                    1, 7, current_confidence,
+                    key=f"confidence_{name}_post"
+                )
+                st.session_state.post_confidence[name] = confidence
+
+            if decision != current_decision:
+                record_decision_time(name, decision, current_decision)
                 st.session_state.decisions[name] = decision
                 st.rerun()
+
             st.divider()
 
         c1, c2, c3 = st.columns([1,2,1])
