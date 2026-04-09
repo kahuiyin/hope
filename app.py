@@ -591,11 +591,11 @@ if not st.session_state.info_collected:
 
     with st.form("experimenter_form"):
         exp_name = st.text_input("姓名", placeholder="请输入您的姓名")
-        exp_id = st.text_input("学号/职业", placeholder="请输入学号或职业内容")
-        exp_gender = st.radio("性别", ["男", "女", "不愿透露"], horizontal=True)
+        exp_id = st.text_input("学号/学校", placeholder="请输入学号或学校名称")
+        exp_gender = st.radio("性别", ["男", "女"], horizontal=True)
         exp_age = st.number_input("年龄", min_value=18, max_value=100, step=1, value=25)
-        exp_major = st.text_input("专业(选填)", placeholder="机械工程、计算机科学等")
-        exp_education = st.selectbox("最高学历", ["本科", "硕士", "博士", "其他"])
+        exp_major = st.text_input("专业", placeholder="填写本人专业，或已就业职位名称")
+        exp_education = st.selectbox("最高学历", ["本科", "硕士", "博士", "其他（专科及以下）"])
         exp_ai_familiarity = st.slider("对人工智能的熟悉程度", 1, 7, 4, help="1=完全不了解，7=非常熟悉")
         exp_recruitment_exp = st.radio("是否有招聘经验", ["有", "无"], horizontal=True)
         exp_similar_exp = st.radio("是否参加过类似的招聘实验", ["是", "否"], horizontal=True)
