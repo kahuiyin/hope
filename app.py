@@ -376,7 +376,8 @@ def switch_to_next_stage():
             return False
     next_stage = get_next_stage(current)
     if next_stage is None:
-        # 所有阶段完成，显示统一问卷
+        # 所有阶段完成，先保存当前阶段（post），然后显示统一问卷
+        save_current_stage()  # 确保 post 阶段数据已保存
         st.session_state.show_final_questionnaire = True
         st.rerun()
         return True
@@ -572,6 +573,9 @@ def save_manipulation_check_data(bias_awareness, bias_detail):
 
 def save_final_questionnaire(dep_scores, fairness, recall, influence, correction, comments):
     """保存最终问卷数据（依赖量表+事后回顾）"""
+    # 确保 post 阶段数据已保存（双重保险）
+    if st.session_state.current_stage == "post":
+        save_current_stage()
     # 保存依赖量表
     dep_data = {
         "items": ALGORITHM_DEPENDENCY_ITEMS,
@@ -844,6 +848,8 @@ if st.session_state.resumes_uploaded:
         next_key = get_next_stage(st.session_state.current_stage)
         if next_key is None:
             if st.button("📤 提交实验数据", type="primary", use_container_width=True):
+                # 先保存 post 阶段数据，再显示问卷
+                save_current_stage()
                 st.session_state.show_final_questionnaire = True
                 st.rerun()
         else:
@@ -994,6 +1000,8 @@ if st.session_state.resumes_uploaded:
             next_key = get_next_stage(st.session_state.current_stage)
             if next_key is None:
                 if st.button("📤 提交实验数据", type="primary"):
+                    # 保存 post 阶段数据再进入问卷
+                    save_current_stage()
                     st.session_state.show_final_questionnaire = True
                     st.rerun()
             else:
