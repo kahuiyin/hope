@@ -691,7 +691,7 @@ if not st.session_state.info_collected:
         exp_ai_familiarity = st.slider("对人工智能的熟悉程度（1分代表不熟悉，7分代表非常熟悉）", 1, 7, 4)
         exp_recruitment_exp = st.radio("是否有招聘经验", ["有", "无"], horizontal=True)
         exp_similar_exp = st.radio("是否参加过类似的招聘实验", ["是", "否"], horizontal=True)
-        st.markdown("#### 算法素养量表（1=完全不同意，7=完全同意）")
+        st.markdown("#### 第一个问卷（1=完全不同意，7=完全同意）")
         alg_lit = []
         for i, q in enumerate(ALGORITHM_LITERACY_ITEMS):
             alg_lit.append(st.slider(f"{i+1}. {q}", 1, 7, 4, key=f"alg_{i}"))
@@ -996,7 +996,7 @@ if st.session_state.resumes_uploaded:
                 st.rerun()
 
         if is_stage_complete():
-            st.success("✅ 本阶段完成，点击下方按钮继续")
+            st.success("✅在本阶段完成前，请不要误触进入下一阶段")
             next_key = get_next_stage(st.session_state.current_stage)
             if next_key is None:
                 if st.button("📤 提交实验数据", type="primary"):
