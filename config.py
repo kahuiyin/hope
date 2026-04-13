@@ -13,7 +13,7 @@ PHOTO_FOLDER = os.path.join(BASE_DIR, "photo")
 
 BIAS_CONFIG = {
     "gender": {
-        "female_coeff": 0.5,
+        "female_coeff": 0.7,
         "male_coeff": 1.0,
     }
 }
