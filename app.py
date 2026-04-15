@@ -705,7 +705,7 @@ if not st.session_state.info_collected:
         exp_id = st.text_input("学号/学校（说明：天津大学学生只需填写学号、已就业或其余学校请填写单位名称）")
         exp_gender = st.radio("性别", ["男", "女"], horizontal=True)
         exp_age = st.number_input("年龄", 18, 100, 25)
-        exp_major = st.text_input("专业")
+        exp_major = st.text_input("专业/就业岗位")
         exp_education = st.selectbox("最高学历（含在读）", ["本科", "硕士", "博士", "其他（专科及以下）"])
         exp_ai_familiarity = st.slider("对人工智能的熟悉程度（1分代表不熟悉，7分代表非常熟悉）", 1, 7, 4)
         exp_recruitment_exp = st.radio("是否有招聘经验", ["有", "无"], horizontal=True)
@@ -798,16 +798,16 @@ if st.session_state.get("show_final_questionnaire", False):
     st.markdown("### 实验结束问卷")
     st.markdown("请根据您的真实感受回答以下所有问题。")
     with st.form("final_questionnaire_form"):
-        st.subheader("第一部分：算法依赖")
+        st.subheader("第一部分")
         dep_scores = []
         for i, item in enumerate(ALGORITHM_DEPENDENCY_ITEMS):
             score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
             dep_scores.append(score)
 
-        st.subheader("第二部分：压力感知")
+        st.subheader("第二部分")
         pressure_score = st.slider(PRESSURE_MANIPULATION_ITEM, 1, 7, 4, key="pressure_manip")
 
-        st.subheader("第三部分：实验反馈")
+        st.subheader("第三部分")
         fairness = st.slider("我觉得 AI 评分的公平性如何？", 1, 7, 4, help="1=非常不公平，7=非常公平")
         recall = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4)
         influence = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4)
