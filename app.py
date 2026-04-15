@@ -798,7 +798,7 @@ if st.session_state.get("show_final_questionnaire", False):
     st.markdown("### 实验结束问卷")
     st.markdown("请根据您的真实感受回答以下所有问题。")
     with st.form("final_questionnaire_form"):
-        st.subheader("第一部分（1=完全同意。7=完全不同意）")
+        st.subheader("第一部分（1=完全不同意。7=完全同意）")
         dep_scores = []
         for i, item in enumerate(ALGORITHM_DEPENDENCY_ITEMS):
             score = st.slider(item, 1, 7, 3, key=f"dep_{i}")
