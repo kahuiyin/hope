@@ -14,6 +14,7 @@ from config import (
     EXPERIMENT_STAGES, STAY_TIME_CONFIG, SORT_OPTIONS,
     RATING_WEIGHTS, BIAS_CONFIG, JOB_DESCRIPTION,
     ALGORITHM_LITERACY_ITEMS, ALGORITHM_DEPENDENCY_ITEMS,
+    PRESSURE_MANIPULATION_ITEM,   # 新增：压力操控检验题
     FIXED_PRESSURE_CONDITION,
     RESUME_FOLDER, PHOTO_FOLDER
 )
@@ -69,6 +70,53 @@ st.set_page_config(
 )
 
 init_session_state()
+
+# ===================== 从 URL 参数恢复进度 =====================
+def restore_session_from_query():
+    """刷新页面后，通过 URL 中的被试 ID 自动恢复实验状态"""
+    if "exp_id" in st.query_params and not st.session_state.info_collected:
+        exp_id = st.query_params["exp_id"]
+        exp_dir = f"experiment_data/{exp_id}"
+        if not os.path.exists(exp_dir):
+            st.error(f"实验目录不存在：{exp_dir}")
+            return False
+
+        # 1. 读取 metadata.json 恢复基本信息
+        metadata_path = os.path.join(exp_dir, "metadata.json")
+        if os.path.exists(metadata_path):
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+            st.session_state.experimenter_id = exp_id
+            st.session_state.experiment_dir = exp_dir
+            st.session_state.experimenter_info = metadata.get("experimenter_info", {})
+            st.session_state.algorithm_literacy = metadata.get("algorithm_literacy_scores", [4]*10)
+            st.session_state.pressure_condition = metadata.get("pressure_condition", FIXED_PRESSURE_CONDITION)
+            st.session_state.info_collected = True
+        else:
+            st.error("无法找到实验元数据文件")
+            return False
+
+        # 2. 读取进度文件
+        load_progress()
+
+        # 3. 重新加载候选人数据（简历文件夹固定）
+        candidates, errors = auto_load_candidates(RESUME_FOLDER, PHOTO_FOLDER)
+        st.session_state.candidates = candidates
+        st.session_state.resumes_uploaded = True
+
+        # 4. 恢复当前阶段数据
+        current = st.session_state.current_stage
+        if not load_stage_data(current):
+            initialize_stage_data(current)
+
+        if current not in st.session_state.stage_start_time:
+            st.session_state.stage_start_time[current] = time.time()
+
+        st.success("实验进度已自动恢复")
+        return True
+    return False
+
+restore_session_from_query()
 
 # ===================== 持久化进度 =====================
 def save_progress():
@@ -376,13 +424,11 @@ def switch_to_next_stage():
             return False
     next_stage = get_next_stage(current)
     if next_stage is None:
-        # 所有阶段完成，先保存当前阶段（post），然后显示统一问卷
         save_current_stage()  # 确保 post 阶段数据已保存
         st.session_state.show_final_questionnaire = True
         st.rerun()
         return True
 
-    # 如果即将进入post阶段且尚未完成操纵检查，则显示操纵检查表单
     if next_stage == "post" and not st.session_state.manipulation_check_done:
         st.session_state.show_manipulation_check = True
         st.rerun()
@@ -414,7 +460,6 @@ def switch_to_next_stage():
     return True
 
 def package_experiment_data():
-    """打包实验数据并返回 zip 数据流"""
     if not st.session_state.experiment_dir:
         st.error("实验目录未创建，请联系管理员。")
         return None
@@ -428,16 +473,13 @@ def package_experiment_data():
     zip_buffer.seek(0)
     return zip_buffer
 
-# ===================== 生成汇总表（中文列名，分性别比例） =====================
+# ===================== 生成汇总表 =====================
 def generate_master_table():
-    """生成一个包含所有数据的扁平化表格（每个被试一行），列名为中文，并增加分性别录用比例"""
     exp_dir = st.session_state.experiment_dir
     if not exp_dir:
         return
 
     record = {}
-
-    # 1. 基本信息
     record["被试编号"] = st.session_state.experimenter_id
     info = st.session_state.experimenter_info
     record["姓名"] = info.get("姓名", "")
@@ -451,12 +493,12 @@ def generate_master_table():
     record["类似实验经验(是/否)"] = info.get("类似实验经验", "")
     record["压力条件"] = st.session_state.pressure_condition
 
-    # 2. 算法素养（10题）
+    # 算法素养
     for i, score in enumerate(st.session_state.algorithm_literacy, 1):
         record[f"算法素养_题{i}"] = score
     record["算法素养_总分"] = sum(st.session_state.algorithm_literacy)
 
-    # 3. 操纵检查
+    # 操纵检查
     manip_path = os.path.join(exp_dir, "manipulation_check.json")
     if os.path.exists(manip_path):
         with open(manip_path, "r", encoding="utf-8") as f:
@@ -464,7 +506,7 @@ def generate_master_table():
         record["是否注意到AI偏差"] = m.get("bias_awareness", "")
         record["偏差详情"] = m.get("bias_detail", "")
 
-    # 4. 事后回顾（从最终问卷中保存的数据）
+    # 事后回顾
     final_path = os.path.join(exp_dir, "final_questionnaire.json")
     if os.path.exists(final_path):
         with open(final_path, "r", encoding="utf-8") as f:
@@ -475,7 +517,7 @@ def generate_master_table():
         record["纠正行为"] = fq.get("correction_behavior", "")
         record["反馈评论"] = fq.get("comments", "")
 
-    # 5. 算法依赖量表（6题）
+    # 算法依赖量表（6题）
     dep_path = os.path.join(exp_dir, "algorithm_dependency.json")
     if os.path.exists(dep_path):
         with open(dep_path, "r", encoding="utf-8") as f:
@@ -485,50 +527,47 @@ def generate_master_table():
             record[f"算法依赖_题{i}"] = s
         record["算法依赖_总分"] = dep.get("total_score", 0)
 
-    # 6. 各阶段决策统计（增加分性别录用比例）
+    # 压力操控检查（独立题目）
+    pressure_path = os.path.join(exp_dir, "pressure_manipulation.json")
+    if os.path.exists(pressure_path):
+        with open(pressure_path, "r", encoding="utf-8") as f:
+            pres = json.load(f)
+        record["压力操控检查得分"] = pres.get("score", "")
+
+    # 各阶段决策统计
     for stage in ["pre", "mid", "post"]:
         csv_path = os.path.join(exp_dir, f"stage_{stage}.csv")
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path, encoding="utf-8-sig")
-            # 总录用/待定/拒绝
             if "招聘决策" in df.columns:
                 record[f"{stage}_录用人数"] = (df["招聘决策"] == "进入面试").sum()
                 record[f"{stage}_待定人数"] = (df["招聘决策"] == "待定").sum()
                 record[f"{stage}_拒绝人数"] = (df["招聘决策"] == "拒绝").sum()
 
-                # 分性别录用比例
                 if "性别" in df.columns:
-                    # 男性
                     male_df = df[df["性别"] == "男"]
                     male_total = len(male_df)
                     male_hired = (male_df["招聘决策"] == "进入面试").sum() if male_total > 0 else 0
                     record[f"{stage}_男性录用比例(%)"] = round(male_hired / male_total * 100, 1) if male_total > 0 else 0
-                    # 女性
                     female_df = df[df["性别"] == "女"]
                     female_total = len(female_df)
                     female_hired = (female_df["招聘决策"] == "进入面试").sum() if female_total > 0 else 0
                     record[f"{stage}_女性录用比例(%)"] = round(female_hired / female_total * 100, 1) if female_total > 0 else 0
 
-            # 阶段总耗时
             if "阶段总耗时（秒）" in df.columns:
                 record[f"{stage}_总耗时(秒)"] = df["阶段总耗时（秒）"].iloc[0] if len(df) > 0 else 0
 
-            # post阶段额外：平均信心 + 分性别平均信心
             if stage == "post" and "决策信心" in df.columns:
-                # 整体平均信心
                 conf_vals = pd.to_numeric(df["决策信心"], errors="coerce").dropna()
                 record["post阶段平均决策信心(1-7)"] = conf_vals.mean() if len(conf_vals) > 0 else 0
-                # 分性别平均信心
                 if "性别" in df.columns:
                     male_conf = pd.to_numeric(df[df["性别"] == "男"]["决策信心"], errors="coerce").dropna()
                     female_conf = pd.to_numeric(df[df["性别"] == "女"]["决策信心"], errors="coerce").dropna()
                     record["post阶段男性平均信心(1-7)"] = male_conf.mean() if len(male_conf) > 0 else 0
                     record["post阶段女性平均信心(1-7)"] = female_conf.mean() if len(female_conf) > 0 else 0
 
-    # 7. 实验日期
     record["实验完成时间"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # 保存为 CSV
     df_master = pd.DataFrame([record])
     master_path = os.path.join(exp_dir, "实验数据汇总.csv")
     df_master.to_csv(master_path, index=False, encoding="utf-8-sig")
@@ -571,12 +610,12 @@ def save_manipulation_check_data(bias_awareness, bias_detail):
     save_progress()
     st.rerun()
 
-def save_final_questionnaire(dep_scores, fairness, recall, influence, correction, comments):
-    """保存最终问卷数据（依赖量表+事后回顾）"""
-    # 确保 post 阶段数据已保存（双重保险）
+def save_final_questionnaire(dep_scores, pressure_score, fairness, recall, influence, correction, comments):
+    # 确保 post 阶段数据已保存
     if st.session_state.current_stage == "post":
         save_current_stage()
-    # 保存依赖量表
+
+    # 保存算法依赖（6题）
     dep_data = {
         "items": ALGORITHM_DEPENDENCY_ITEMS,
         "scores": dep_scores,
@@ -586,6 +625,16 @@ def save_final_questionnaire(dep_scores, fairness, recall, influence, correction
     dep_path = os.path.join(st.session_state.experiment_dir, "algorithm_dependency.json")
     with open(dep_path, "w", encoding="utf-8") as f:
         json.dump(dep_data, f, ensure_ascii=False, indent=2)
+
+    # 保存压力操控检验（独立题目）
+    pressure_data = {
+        "item": PRESSURE_MANIPULATION_ITEM,
+        "score": pressure_score,
+        "timestamp": datetime.now().isoformat()
+    }
+    pressure_path = os.path.join(st.session_state.experiment_dir, "pressure_manipulation.json")
+    with open(pressure_path, "w", encoding="utf-8") as f:
+        json.dump(pressure_data, f, ensure_ascii=False, indent=2)
 
     # 保存事后回顾
     debrief_data = {
@@ -600,9 +649,7 @@ def save_final_questionnaire(dep_scores, fairness, recall, influence, correction
     with open(debrief_path, "w", encoding="utf-8") as f:
         json.dump(debrief_data, f, ensure_ascii=False, indent=2)
 
-    # 生成汇总表
     generate_master_table()
-    # 显示感谢界面
     st.session_state.show_final_questionnaire = False
     st.session_state.show_thanks = True
     save_progress()
@@ -629,6 +676,7 @@ with st.sidebar:
 
         if not st.session_state.resumes_uploaded:
             if st.button("✏️ 修改信息", use_container_width=True):
+                st.query_params.clear()
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
                 st.rerun()
@@ -637,6 +685,7 @@ with st.sidebar:
             if st.button("⚠️ 重置整个实验", use_container_width=True):
                 if st.session_state.experiment_dir and os.path.exists(st.session_state.experiment_dir):
                     shutil.rmtree(st.session_state.experiment_dir)
+                st.query_params.clear()
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
                 st.rerun()
@@ -711,6 +760,8 @@ if not st.session_state.info_collected:
             st.session_state.algorithm_literacy = alg_lit
             st.session_state.pressure_condition = FIXED_PRESSURE_CONDITION
             st.session_state.info_collected = True
+            # 将被试ID写入URL参数，便于刷新后恢复
+            st.query_params["exp_id"] = st.session_state.experimenter_id
             metadata = {
                 "experimenter_id": st.session_state.experimenter_id,
                 "start_time": datetime.now().isoformat(),
@@ -774,7 +825,7 @@ if st.session_state.get("show_manipulation_check", False):
             save_manipulation_check_data(bias_awareness, bias_detail)
     st.stop()
 
-# 统一最终问卷（依赖量表+事后回顾）
+# 统一最终问卷（依赖量表+压力题+事后回顾）
 if st.session_state.get("show_final_questionnaire", False):
     st.markdown("### 实验结束问卷")
     st.markdown("请根据您的真实感受回答以下所有问题。")
@@ -782,13 +833,13 @@ if st.session_state.get("show_final_questionnaire", False):
         st.subheader("第一部分：算法依赖")
         dep_scores = []
         for i, item in enumerate(ALGORITHM_DEPENDENCY_ITEMS):
-            if "压力" in item:
-                score = st.slider(item, 1, 7, 4, key=f"dep_{i}")
-            else:
-                score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
+            score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
             dep_scores.append(score)
-        
-        st.subheader("第二部分：实验反馈")
+
+        st.subheader("第二部分：压力感知")
+        pressure_score = st.slider(PRESSURE_MANIPULATION_ITEM, 1, 7, 4, key="pressure_manip")
+
+        st.subheader("第三部分：实验反馈")
         fairness = st.slider("我觉得 AI 评分的公平性如何？", 1, 7, 4, help="1=非常不公平，7=非常公平")
         recall = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4)
         influence = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4)
@@ -801,7 +852,7 @@ if st.session_state.get("show_final_questionnaire", False):
         
         submitted = st.form_submit_button("提交并完成实验")
         if submitted:
-            save_final_questionnaire(dep_scores, fairness, recall, influence, correction, comments)
+            save_final_questionnaire(dep_scores, pressure_score, fairness, recall, influence, correction, comments)
     st.stop()
 
 # 感谢界面
@@ -848,7 +899,6 @@ if st.session_state.resumes_uploaded:
         next_key = get_next_stage(st.session_state.current_stage)
         if next_key is None:
             if st.button("📤 提交实验数据", type="primary", use_container_width=True):
-                # 先保存 post 阶段数据，再显示问卷
                 save_current_stage()
                 st.session_state.show_final_questionnaire = True
                 st.rerun()
@@ -964,7 +1014,6 @@ if st.session_state.resumes_uploaded:
                 )
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # 如果是 post 阶段，显示决策信心滑块
             if st.session_state.current_stage == "post":
                 current_confidence = st.session_state.post_confidence.get(name, 4)
                 confidence = st.slider(
@@ -1000,7 +1049,6 @@ if st.session_state.resumes_uploaded:
             next_key = get_next_stage(st.session_state.current_stage)
             if next_key is None:
                 if st.button("📤 提交实验数据", type="primary"):
-                    # 保存 post 阶段数据再进入问卷
                     save_current_stage()
                     st.session_state.show_final_questionnaire = True
                     st.rerun()
