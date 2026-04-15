@@ -195,4 +195,4 @@ ALGORITHM_DEPENDENCY_ITEMS = [
     "我在决策过程中会主动寻求算法的帮助",
     "即使算法曾经出错，我仍然会参考它的建议"
 ]
-PRESSURE_MANIPULATION_ITEM = "在刚才的任务中，我感觉必须在严格的时间限制下匆忙完成决策。（1代表不同意，7代表完全同意）"
+PRESSURE_MANIPULATION_ITEM = "在刚才的任务中，我感觉必须在严格的时间限制下匆忙完成决策。（1代表完全不同意，7代表完全同意）"
