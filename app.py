@@ -798,10 +798,10 @@ if st.session_state.get("show_final_questionnaire", False):
     st.markdown("### 实验结束问卷")
     st.markdown("请根据您的真实感受回答以下所有问题。")
     with st.form("final_questionnaire_form"):
-        st.subheader("第一部分")
+        st.subheader("第一部分（1=完全同意。7=完全不同意）")
         dep_scores = []
         for i, item in enumerate(ALGORITHM_DEPENDENCY_ITEMS):
-            score = st.slider(item, 1, 5, 3, key=f"dep_{i}")
+            score = st.slider(item, 1, 7, 3, key=f"dep_{i}")
             dep_scores.append(score)
 
         st.subheader("第二部分")
@@ -809,8 +809,8 @@ if st.session_state.get("show_final_questionnaire", False):
 
         st.subheader("第三部分")
         fairness = st.slider("我觉得 AI 评分的公平性如何？", 1, 7, 4, help="1=非常不公平，7=非常公平")
-        recall = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4)
-        influence = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4)
+        recall = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4，help="1=非常不同意，7=非常同意")
+        influence = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4，help="1=非常不同意，7=非常同意")
         correction = st.radio(
             "在刚才的独立决策阶段（实验3），你是否有意识地尝试纠正你察觉到的偏差？",
             ["是，我尽量反着 AI 的建议来", "是，但我仍部分参考了 AI", "否，我认为 AI 的评分有道理", "我根本没注意到偏差"],
