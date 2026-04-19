@@ -648,7 +648,7 @@ with st.sidebar:
 
         # 压力提示（移动到侧边栏）
         st.markdown("---")
-        st.markdown("### ⏱️ 任务压力提示")
+        st.markdown("### ⏱️ 任务提示")
         if st.session_state.pressure_condition == "高压力":
             st.warning("⚠️ 每个阶段决策需在10分钟内完成（进入此阶段既开始计时，点击决策刷新计时）")
             if st.session_state.current_stage not in st.session_state.stage_start_time:
