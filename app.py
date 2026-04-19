@@ -650,7 +650,7 @@ with st.sidebar:
         st.markdown("---")
         st.markdown("### ⏱️ 任务压力提示")
         if st.session_state.pressure_condition == "高压力":
-            st.warning("⚠️ 每个阶段决策需在10分钟内完成")
+            st.warning("⚠️ 每个阶段决策需在10分钟内完成（进入此阶段既开始计时，点击决策刷新计时）")
             if st.session_state.current_stage not in st.session_state.stage_start_time:
                 st.session_state.stage_start_time[st.session_state.current_stage] = time.time()
             elapsed = time.time() - st.session_state.stage_start_time[st.session_state.current_stage]
@@ -1019,7 +1019,7 @@ if st.session_state.resumes_uploaded:
                 st.rerun()
 
         if is_stage_complete():
-            st.success("✅在本阶段完成前，请不要误触进入下一阶段")
+            st.success("✅在本阶段完成前，请不要误触进入下一阶段，本阶段一共六页")
             next_key = get_next_stage(st.session_state.current_stage)
             if next_key is None:
                 if st.button("📤 提交实验数据", type="primary"):
