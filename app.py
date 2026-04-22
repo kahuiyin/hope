@@ -650,14 +650,14 @@ with st.sidebar:
         st.markdown("---")
         st.markdown("### ⏱️ 任务提示")
         if st.session_state.pressure_condition == "高压力":
-            st.warning("⚠️ 每个阶段决策需在10分钟内完成（进入此阶段既开始计时，点击决策刷新计时）")
+            st.warning("⚠️ 每个阶段决策需在9分钟内完成（进入此阶段既开始计时，点击决策刷新计时）")
             if st.session_state.current_stage not in st.session_state.stage_start_time:
                 st.session_state.stage_start_time[st.session_state.current_stage] = time.time()
             elapsed = time.time() - st.session_state.stage_start_time[st.session_state.current_stage]
-            if elapsed > 600:
-                st.error("⚠️ 当前阶段已超过10分钟！")
+            if elapsed > 540:
+                st.error("⚠️ 当前阶段已超过9分钟！")
             else:
-                st.info(f"⏱️ 当前阶段已用时：{int(elapsed//60)}分{int(elapsed%60)}秒 / 10分钟")
+                st.info(f"⏱️ 当前阶段已用时：{int(elapsed//60)}分{int(elapsed%60)}秒 / 9分钟")
         else:
             st.success("请按照您的真实想法进行决策")
 
