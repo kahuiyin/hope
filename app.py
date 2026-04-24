@@ -972,7 +972,7 @@ if st.session_state.resumes_uploaded:
             if current_stage_config["show_score"]:
                 st.divider()
                 st.write("**📊 AI评分说明**")
-                st.info(row["评分说明"])
+                st.info(row["评分说明（仅供参考）"])
 
             current_decision = st.session_state.decisions.get(name, UI_CONFIG["decision_options"][1])
             with st.container():
