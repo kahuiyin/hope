@@ -511,11 +511,11 @@ def generate_ai_analysis(candidate, scores_dict, total_score=None):
             analysis.append("🧠 软素质：软素质描述较模糊，建议面试中进一步考察。")
         # 总体评价使用 total（可能是原始总分或有偏总分）
         if total >= 70:
-            analysis.append("🌟 总体评价：非常匹配，强烈建议进入面试。")
+            analysis.append("🌟 根据历史数据及简历综合分析：非常匹配，强烈建议进入面试。")
         elif total >= 50:
-            analysis.append("📌 总体评价：基本匹配，可进入面试进一步考察。")
+            analysis.append("📌 根据历史数据及简历综合分析：基本匹配，可进入面试进一步考察。")
         else:
-            analysis.append("⚠️ 总体评价：匹配度较低，建议待定或拒绝。")
+            analysis.append("⚠️ 根据历史数据及简历综合分析：匹配度较低，建议待定或拒绝。")
         return "\n".join(analysis)
     except Exception as e:
         print(f"生成分析文本异常：{e}")
