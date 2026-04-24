@@ -783,11 +783,11 @@ st.divider()
 # ===================== 问卷表单 =====================
 # 操纵检查表单
 if st.session_state.get("show_manipulation_check", False):
-    st.markdown("### 请回答以下问题（必填）")
+    st.markdown("### 实验检验（必填）")
     st.markdown("在刚才的 **【实验2】AI辅助** 阶段，你观察到 AI 评分是否存在系统性偏差？")
     with st.form("manipulation_check_form"):
         bias_awareness = st.radio(
-            "你对 AI 评分的看法：",
+            "我认为ai对于候选人的评分：",
             ["没有注意到明显的偏差", "注意到女性候选人得分普遍偏低", "注意到男性候选人得分普遍偏低", "注意到其他类型的偏差"],
             index=0
         )
@@ -812,11 +812,11 @@ if st.session_state.get("show_final_questionnaire", False):
         pressure_score = st.slider(PRESSURE_MANIPULATION_ITEM, 1, 7, 4, key="pressure_manip")
 
         st.subheader("第三部分")
-        fairness = st.slider("我觉得 AI 评分的公平性如何？", 1, 7, 4, help="1=非常不公平，7=非常公平")
-        recall = st.slider("在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。", 1, 7, 4, help="1=非常不同意，7=非常同意")
-        influence = st.slider("AI 辅助阶段对我最后的独立决策产生了很大影响。", 1, 7, 4, help="1=非常不同意，7=非常同意")
+        fairness = st.slider("1.我觉得 AI 评分的公平性如何？（1=非常不公平，7=非常公平）", 1, 7, 4, help="1=非常不公平，7=非常公平")
+        recall = st.slider("2.在后续独立决策时，我会不自觉地回忆起 AI 给出的分数。（1=非常不同意，7=非常同意）", 1, 7, 4, help="1=非常不同意，7=非常同意")
+        influence = st.slider("3.AI 辅助阶段对我最后的独立决策产生了很大影响（1=非常不同意，7=非常同意）。", 1, 7, 4, help="1=非常不同意，7=非常同意")
         correction = st.radio(
-            "在刚才的独立决策阶段（实验3），你是否有意识地尝试纠正你察觉到的偏差？",
+            "在刚才的独立决策阶段（实验3），如果你观察到偏差，你是否有意识地尝试纠正你察觉到的偏差？",
             ["是，我尽量反着 AI 的建议来", "是，但我仍部分参考了 AI", "否，我认为 AI 的评分有道理", "我根本没注意到偏差"],
             index=3
         )
