@@ -717,7 +717,7 @@ if not st.session_state.info_collected:
     st.markdown("请填写以下信息开始实验")
     with st.form("experimenter_form"):
         exp_name = st.text_input("姓名")
-        exp_id = st.text_input("学号/学校（说明：天津大学学生只需填写学号、已就业或其余学校请填写单位名称）")
+        exp_id = st.text_input("学校/单位名称")
         exp_gender = st.radio("性别", ["男", "女"], horizontal=True)
         exp_age = st.number_input("年龄", 18, 100, 25)
         exp_major = st.text_input("专业/就业岗位")
@@ -759,7 +759,7 @@ if not st.session_state.info_collected:
             save_progress()
             st.rerun()
         elif submitted:
-            st.warning("请填写姓名和学号")
+            st.warning("请填写姓名及所在单位")
     st.stop()
 
 if st.session_state.get("scroll_to_top", False):
